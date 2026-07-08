@@ -68,7 +68,7 @@ static int builtin_cd(char **argv, int argc) {
 }
 
 static int builtin_pwd(void) {
-    char cwd[PATH_MAX];
+    char cwd[4096];
     if (getcwd(cwd, sizeof(cwd)) == NULL) {
         perror("pwd");
         return 1;
