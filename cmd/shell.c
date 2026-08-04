@@ -1,9 +1,12 @@
 #include <ctype.h>
+#include <dirent.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 #define MAX_ARGS 64
@@ -123,6 +126,14 @@ static int builtin_help(int argc, char **argv) {
     puts("  echo [text]          Print text");
     puts("  history              Show command history");
     puts("  clear                Clear the screen");
+    puts("  date                 Show current date");
+    puts("  uname                Show kernel name");
+    puts("  version              Show shell version");
+    puts("  ls [path]            List directory entries");
+    puts("  mkdir [dir]          Create a directory");
+    puts("  touch [file]         Create an empty file");
+    puts("  cat [file]           Print a file");
+    puts("  env                  Show environment variables");
     return 0;
 }
 
@@ -190,6 +201,104 @@ static int builtin_history(int argc, char **argv) {
     return 0;
 }
 
+static int builtin_date(int argc, char **argv) {
+    (void)argc;
+    (void)argv;
+    puts("2026-08-04");
+    return 0;
+}
+
+static int builtin_uname(int argc, char **argv) {
+    (void)argc;
+    (void)argv;
+    puts("CSLOS");
+    return 0;
+}
+
+static int builtin_version(int argc, char **argv) {
+    (void)argc;
+    (void)argv;
+    puts("CSL shell version 0.1");
+    return 0;
+}
+
+static int builtin_ls(int argc, char **argv) {
+    const char *path = (argc > 1) ? argv[1] : ".";
+    DIR *dir = opendir(path);
+    if (dir == NULL) {
+        fprintf(stderr, "csl: ls: %s\n", strerror(errno));
+        return 1;
+    }
+
+    struct dirent *entry;
+    while ((entry = readdir(dir)) != NULL) {
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+            continue;
+        }
+        puts(entry->d_name);
+    }
+    closedir(dir);
+    return 0;
+}
+
+static int builtin_mkdir(int argc, char **argv) {
+    if (argc < 2) {
+        fprintf(stderr, "csl: mkdir: missing directory name\n");
+        return 1;
+    }
+
+    if (mkdir(argv[1], 0755) != 0) {
+        fprintf(stderr, "csl: mkdir: %s\n", strerror(errno));
+        return 1;
+    }
+    return 0;
+}
+
+static int builtin_touch(int argc, char **argv) {
+    if (argc < 2) {
+        fprintf(stderr, "csl: touch: missing file name\n");
+        return 1;
+    }
+
+    FILE *file = fopen(argv[1], "a");
+    if (file == NULL) {
+        fprintf(stderr, "csl: touch: %s\n", strerror(errno));
+        return 1;
+    }
+    fclose(file);
+    return 0;
+}
+
+static int builtin_cat(int argc, char **argv) {
+    if (argc < 2) {
+        fprintf(stderr, "csl: cat: missing file name\n");
+        return 1;
+    }
+
+    FILE *file = fopen(argv[1], "r");
+    if (file == NULL) {
+        fprintf(stderr, "csl: cat: %s\n", strerror(errno));
+        return 1;
+    }
+
+    char buffer[512];
+    while (fgets(buffer, sizeof(buffer), file) != NULL) {
+        fputs(buffer, stdout);
+    }
+    fclose(file);
+    return 0;
+}
+
+static int builtin_env(int argc, char **argv) {
+    (void)argc;
+    (void)argv;
+    extern char **environ;
+    for (char **env = environ; *env != NULL; ++env) {
+        puts(*env);
+    }
+    return 0;
+}
+
 static int run_external(const char *path, char *const argv[]) {
     (void)path;
     (void)argv;
@@ -197,7 +306,7 @@ static int run_external(const char *path, char *const argv[]) {
     return 127;
 }
 
-static int execute_command(char **argv) {
+static int execute_command(char **argv, int argc) {
     if (argv[0] == NULL) {
         return 0;
     }
@@ -207,22 +316,46 @@ static int execute_command(char **argv) {
     }
 
     if (strcmp(argv[0], "help") == 0) {
-        return builtin_help(0, argv);
+        return builtin_help(argc, argv);
     }
     if (strcmp(argv[0], "cd") == 0) {
-        return builtin_cd(0, argv);
+        return builtin_cd(argc, argv);
     }
     if (strcmp(argv[0], "pwd") == 0) {
-        return builtin_pwd(0, argv);
+        return builtin_pwd(argc, argv);
     }
     if (strcmp(argv[0], "echo") == 0) {
-        return builtin_echo(0, argv);
+        return builtin_echo(argc, argv);
     }
     if (strcmp(argv[0], "clear") == 0) {
-        return builtin_clear(0, argv);
+        return builtin_clear(argc, argv);
     }
     if (strcmp(argv[0], "history") == 0) {
-        return builtin_history(0, argv);
+        return builtin_history(argc, argv);
+    }
+    if (strcmp(argv[0], "date") == 0) {
+        return builtin_date(argc, argv);
+    }
+    if (strcmp(argv[0], "uname") == 0) {
+        return builtin_uname(argc, argv);
+    }
+    if (strcmp(argv[0], "version") == 0) {
+        return builtin_version(argc, argv);
+    }
+    if (strcmp(argv[0], "ls") == 0) {
+        return builtin_ls(argc, argv);
+    }
+    if (strcmp(argv[0], "mkdir") == 0) {
+        return builtin_mkdir(argc, argv);
+    }
+    if (strcmp(argv[0], "touch") == 0) {
+        return builtin_touch(argc, argv);
+    }
+    if (strcmp(argv[0], "cat") == 0) {
+        return builtin_cat(argc, argv);
+    }
+    if (strcmp(argv[0], "env") == 0) {
+        return builtin_env(argc, argv);
     }
 
     int status = run_external(argv[0], argv);
@@ -240,7 +373,11 @@ int main(void) {
 
     for (;;) {
         if (isatty(STDIN_FILENO)) {
-            fputs("CSL> ", stdout);
+            if (kernel_getcwd(current_dir, sizeof(current_dir)) != NULL) {
+                printf("CSL:%s> ", current_dir);
+            } else {
+                fputs("CSL> ", stdout);
+            }
             fflush(stdout);
         }
 
@@ -261,7 +398,7 @@ int main(void) {
             continue;
         }
 
-        int status = execute_command(tokens);
+        int status = execute_command(tokens, count);
         if (status < 0) {
             free_tokens(tokens, count);
             break;
