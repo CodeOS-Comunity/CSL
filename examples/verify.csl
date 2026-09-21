@@ -1,0 +1,100 @@
+# verify.csl — CSL interpreter self-test (host port).
+# Run with: ./cmd/csl examples/verify.csl   (expect "ALL PASS", no "FAIL:" lines)
+#
+# Notes on language semantics (matching the CodeOS kernel implementation):
+#   * arrays are string reprs like "[1, 2, 3]"; push()/pop() are immutable —
+#     they return a NEW array, so assign the result back:  arr = push(arr, x)
+#   * `for` is C-style:  for (init; cond; update) { ... }
+
+# --- arithmetic ---
+print "verify: arithmetic"
+let ok = 0
+if 2 + 3 == 5 { ok = ok + 1 } else { print "FAIL: add" }
+if 10 - 4 == 6 { ok = ok + 1 } else { print "FAIL: sub" }
+if 6 * 7 == 42 { ok = ok + 1 } else { print "FAIL: mul" }
+if 17 / 5 == 3 { ok = ok + 1 } else { print "FAIL: idiv" }
+if 17 % 5 == 2 { ok = ok + 1 } else { print "FAIL: mod" }
+if -3 + 3 == 0 { ok = ok + 1 } else { print "FAIL: neg" }
+if 2 + 3 * 4 == 14 { ok = ok + 1 } else { print "FAIL: precedence" }
+if (2 + 3) * 4 == 20 { ok = ok + 1 } else { print "FAIL: parens" }
+
+# --- comparisons and logic ---
+print "verify: logic"
+if 1 < 2 and 3 > 2 and 2 <= 2 and 3 >= 3 { ok = ok + 1 } else { print "FAIL: cmp" }
+if not (1 > 2) { ok = ok + 1 } else { print "FAIL: not" }
+if 1 == 1 or 1 == 2 { ok = ok + 1 } else { print "FAIL: or" }
+
+# --- strings ---
+print "verify: strings"
+let s = "Hello, CodeOS!"
+if len(s) == 14 { ok = ok + 1 } else { print "FAIL: len" }
+if upper(s) == "HELLO, CODEOS!" { ok = ok + 1 } else { print "FAIL: upper" }
+if lower("ABC") == "abc" { ok = ok + 1 } else { print "FAIL: lower" }
+if chrat(s, 0) == "H" { ok = ok + 1 } else { print "FAIL: chrat" }
+if substr(s, 7, 6) == "CodeOS" { ok = ok + 1 } else { print "FAIL: substr" }
+if instr(s, "CodeOS") == 7 { ok = ok + 1 } else { print "FAIL: instr" }
+if contains(s, "CO") or not contains(s, "Hello") { print "FAIL: contains" } else { ok = ok + 1 }
+if startswith(s, "Hello") and endswith(s, "!") { ok = ok + 1 } else { print "FAIL: start/endswith" }
+if repeat("ab", 3) == "ababab" { ok = ok + 1 } else { print "FAIL: repeat" }
+if trim("  pad  ") == "pad" { ok = ok + 1 } else { print "FAIL: trim" }
+if replace(s, "Hello", "Hi") == "Hi, CodeOS!" { ok = ok + 1 } else { print "FAIL: replace" }
+if ord("A") == 65 and chr(65) == "A" { ok = ok + 1 } else { print "FAIL: ord/chr" }
+if split("a,b,c", ",") == ["a", "b", "c"] { ok = ok + 1 } else { print "FAIL: split" }
+if join(["x", "y"], "-") == "x-y" { ok = ok + 1 } else { print "FAIL: join" }
+
+# --- numbers ---
+print "verify: numbers"
+if abs(-7) == 7 { ok = ok + 1 } else { print "FAIL: abs" }
+if min(3, 9) == 3 and max(3, 9) == 9 { ok = ok + 1 } else { print "FAIL: min/max" }
+if pow(2, 8) == 256 { ok = ok + 1 } else { print "FAIL: pow" }
+if gcd(12, 18) == 6 and lcm(4, 6) == 12 { ok = ok + 1 } else { print "FAIL: gcd/lcm" }
+if isprime(7) and not isprime(9) { ok = ok + 1 } else { print "FAIL: isprime" }
+if fact(5) == 120 { ok = ok + 1 } else { print "FAIL: fact" }
+if iseven(4) and isodd(3) { ok = ok + 1 } else { print "FAIL: iseven/isodd" }
+if sign(-5) == -1 and sign(0) == 0 { ok = ok + 1 } else { print "FAIL: sign" }
+let r = rand(10)
+if r >= 0 and r < 10 { ok = ok + 1 } else { print "FAIL: rand bounds" }
+
+# --- arrays (repr strings like "[a, b]") ---
+print "verify: arrays"
+let arr = [1, 2, 3]
+if len(arr) == 3 { ok = ok + 1 } else { print "FAIL: arr len" }
+arr = push(arr, 4)
+if len(arr) == 4 { ok = ok + 1 } else { print "FAIL: push" }
+arr = pop(arr)
+if len(arr) == 3 { ok = ok + 1 } else { print "FAIL: pop" }
+if at(arr, 0) == 1 { ok = ok + 1 } else { print "FAIL: at" }
+if first(arr) == [1] and last(arr) == [3] { ok = ok + 1 } else { print "FAIL: first/last" }
+if lcontains(arr, 2) and not lcontains(arr, 99) { ok = ok + 1 } else { print "FAIL: lcontains" }
+
+# --- control flow: while / for ---
+print "verify: loops"
+let sum = 0
+let i = 1
+while i <= 10 {
+    sum = sum + i
+    i = i + 1
+}
+if sum == 55 { ok = ok + 1 } else { print "FAIL: while sum" }
+let prod = 1
+for (let j = 1; j <= 4; j = j + 1) {
+    prod = prod * j
+}
+if prod == 24 { ok = ok + 1 } else { print "FAIL: for" }
+
+# --- functions and recursion ---
+print "verify: functions"
+function fib(n) {
+    if n < 2 {
+        return n
+    }
+    return fib(n - 1) + fib(n - 2)
+}
+if fib(10) == 55 { ok = ok + 1 } else { print "FAIL: fib" }
+
+print "verify: " + str(ok) + " checks passed"
+if ok == 43 {
+    print "ALL PASS"
+} else {
+    print "FAIL: total mismatch"
+}
