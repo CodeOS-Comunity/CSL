@@ -560,9 +560,9 @@ static node_t *parse_add(lexer_t *lx) {
 }
 
 static node_t *parse_mul(lexer_t *lx) {
-    /* host-port fix: the kernel original parses the first operand with
-     * parse_postfix(), which skips unary operators, so leading `not`/`-`
-     * never parsed. parse_unary() handles both. */
+    /* script engine fix: parse the first operand with parse_unary() so that a
+     * leading unary `not`/`-` parses. The original used parse_postfix(),
+     * which skips unary operators entirely. */
     node_t *n = parse_unary(lx);
     while (lx->cur.type == TOK_STAR || lx->cur.type == TOK_SLASH || lx->cur.type == TOK_PERCENT) {
         tok_type_t op = lx->cur.type;
@@ -1222,12 +1222,11 @@ static script_val_t repr_obj_key(const char *s, const char *key) {
 
 /* ---- function invocation ---- */
 
-/* Host-port fix: the kernel original keeps a single save slot, so nested
- * recursion overwrites the in-flight frame and corrupts variables whenever
- * a function body makes more than one call (e.g. fib(n-1) + fib(n-2)).
- * This stack of frames restores correctly at any depth (FUNC_DEPTH_MAX
- * bounds call depth at 32, so 64 frames is plenty). */
-#define VAR_SAVE_STACK 64
+/* script engine fix: the original kept a single save slot, so nested function
+ * calls overwrote the in-flight frame and corrupted variables whenever a body
+ * made more than one call (e.g. fib(n-1) + fib(n-2)). Use a stack of frames;
+ * call depth is bounded by FUNC_DEPTH_MAX (32), so that many frames suffice. */
+#define VAR_SAVE_STACK 32
 static var_entry_t saved_vars[VAR_SAVE_STACK][VAR_MAX];
 static int saved_var_count[VAR_SAVE_STACK];
 static int save_depth;

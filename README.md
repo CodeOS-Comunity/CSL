@@ -114,10 +114,12 @@ CodeOS-kernel implementation:
   timer calls, the kernel filesystem) are provided by `cmd/csl_host.c` on
   this host build. The x11_* canvas bridge is compiled out with
   `CSL_HOST_PORT` (it is kernel-only and guarded in `csl_lang.c`).
-- Two fixes are applied on top of the kernel sources (marked in the code):
+- Two script-engine fixes were found during this port and are now applied in
+  both the kernel and here (marked with `script engine fix` comments in
+  `cmd/script.c`):
   1. `parse_mul` parses its first operand with `parse_unary()`, so leading
-     unary `not` / `-` work. The kernel original used `parse_postfix()`,
-     which skipped unary operators at the start of an expression.
+     unary `not` / `-` work. The original used `parse_postfix()`, which
+     skipped unary operators at the start of an expression.
   2. `vars_save`/`vars_restore` use a stack of frames instead of a single
      save slot, so recursive functions that make more than one call per body
      (e.g. `fib(n-1) + fib(n-2)`) restore variables correctly.
